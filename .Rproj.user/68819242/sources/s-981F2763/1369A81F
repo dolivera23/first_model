@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1549549236341.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "1369A81F",
+    "lastKnownWriteTime" : 8457606642722434671,
+    "last_content_update" : 1549549236341,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "4FA119EB",
+        "caption" : "ro_vec",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=ro_vec&cache_key=4FA119EB",
+        "displayedObservations" : 100,
+        "environment" : "",
+        "object" : "ro_vec",
+        "preview" : 0,
+        "totalObservations" : 100,
+        "variables" : 2
+    },
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

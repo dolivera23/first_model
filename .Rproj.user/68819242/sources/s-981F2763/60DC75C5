@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1549301469912.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "60DC75C5",
+    "lastKnownWriteTime" : 1549301493,
+    "last_content_update" : 1549301493497,
+    "path" : "C:/Users/Daniela Olivera Mesa/OneDrive - Imperial College London/PhD/Codes/sir_mult.R",
+    "project_path" : "sir_mult.R",
+    "properties" : {
+        "cursorPosition" : "15,27",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

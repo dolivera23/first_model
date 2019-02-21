@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1548344496745.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "EE3F5EC4",
+    "lastKnownWriteTime" : 1549990588,
+    "last_content_update" : 1549990588084,
+    "path" : "C:/Users/Daniela Olivera Mesa/OneDrive - Imperial College London/PhD/Codes/solver.R",
+    "project_path" : "solver.R",
+    "properties" : {
+        "cursorPosition" : "260,11",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
