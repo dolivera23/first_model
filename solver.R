@@ -48,7 +48,7 @@ ggplot(sir_mult_long, aes(x = t, y = value, col = variable)) + geom_line() + coo
 ## --------- Vaccination SIR model ---->
 
 cov <- 1 - 1 / ro
-R0 <- cov * N
+R0 <- cov * N   #Initialpopulation recovered 
 
 sir_vacc <- runModel(
     "SIR_vacc.R",
@@ -83,23 +83,7 @@ for (i in c(1:length(cov_range))) {
   #tryCatch({
     print(i)
     
-    
-    sir_vacc <-
-      runModel(
-        "SIR_vacc.R",
-        tt,
-        np = npop,
-        N = N,
-        rec = rec,
-        ro = ro,
-        alpha = alpha,
-        I0 = I0,
-        cov = cov,
-        vacc_time = 1,
-        R0 = R0
-      )
-    
-    
+    sir_vacc <- runModel("SIR_vacc.R",tt, np = npop, N = N, rec = rec, ro = ro,  alpha = alpha, I0 = I0,cov = cov, vacc_time = 1, R0 = R0)
     
  # }, error = function(e) {
   #  cat("ERROR :", conditionMessage(e), "\n")
@@ -275,33 +259,16 @@ R0_min <- nloptr(
     Vmax = 1.5e6
   )
 
-min_sis <- 
-  nloptr(
-    x0 = cov_0,
-    eval_f = sis_min ,
-    eval_g_ineq = g_min,
-    lb = c(0, 0, 0),
-    ub = c(1, 1, 1),
-    opts = opts,
-    alpha = alpha,
-    rec = rec,
-    ro = ro,
-    N = N,
-    Vmax = 1.5e6
+min_sis <- nloptr(x0 = cov_0, eval_f = sis_min ,eval_g_ineq = g_min,lb = c(0, 0, 0),ub = c(1, 1, 1),opts = opts,alpha = alpha,rec = rec,ro = ro,
+    N = N,Vmax = 2e6
   )
 
-min_sir <-
-  nloptr(
-    x0 = cov_0,
-    eval_f = sir_min ,
-    eval_g_ineq = g_min,
-    lb = c(0, 0, 0),
-    ub = c(1, 1, 1),
-    opts = opts,
-    alpha = alpha,
-    rec = rec,
-    ro = ro,
-    N = N,
-    Vmax = 1.5e6
-  )
+cov_0 <- c(0.9,0.9,0.9)
+
+opts <- list("algorithm" = "NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-8)
+
+min_sir <- nloptr(x0 = cov_0, eval_f = sir_min , eval_g_ineq = g_min, lb = c(0, 0, 0), ub = c(1, 1, 1), opts = opts, alpha = alpha, rec = rec,
+                  ro = ro,N = N,Vmax = 2e6)
+
+
 
