@@ -1,0 +1,290 @@
+---
+title: "Three patch model with vaccination"
+author: "Daniela Olivera"
+Date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
+
+# Load function file
+source ("fcns.R")
+
+# Installing requiered packages
+if ( !require(rootSolve)) install.packages("rootSolve")
+library(rootSolve)
+
+if ( !require(nloptr)) install.packages("nloptr")
+library("nloptr")
+
+if ( !require(ggplot2)) install.packages("ggplot2")
+library("ggplot2")
+
+```
+
+
+### The system 
+
+The system is three patch meta-population model. Each patch has its own disease dynamics (SIS o SIR) and is interconnected, as shown below.  
+
+
+<center>
+![](Patch_model.png#center){width=30%} //
+</center>
+
+
+
+
+
+**Setting up the model parameters for the model:** 
+
+1. Number of patches: _npop_
+2. Population in each patch: _N_
+3. Individual Ro: _ro_
+4. Patch recovery rate: _rec_
+5. Interaction matrix between patches: 
+$$\mathbf{\alpha } = \left[\begin{array}
+{rrr}
+1 & \alpha_{LM} & \alpha_{LH} \\
+\alpha_{ML} & 1 & \alpha_{MH} \\
+\alpha_{HL} & \alpha_{HM} & 1
+\end{array}\right]
+$$
+6. Initial conditions for simulations: _I0_
+
+
+```{r parameters}
+
+# General parameters for all the models
+npop <- 3
+N <- c(1e6, 1e6, 1e6)
+rec <- c(0.5, 0.5, 0.5)
+ro <- c(1.5, 5, 15)
+alpha <-
+  matrix(
+    c(1, 0.1, 0.1, 0.1, 1, 0.1, 0.1, 0.1, 1),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+I0 <- c(1, 1, 1)
+
+#Time
+tt <- seq(0, 100, length.out = 201)
+```
+
+#### Basic reproductive number 
+
+The basic reproductive number is estimated using the methods described by Diekmann et al (2010) in "The construction of next-generation
+matrices for compartmental epidemic models". 
+
+Both SIS and SIR models have the same  differential equations for the infectous compartment, therefore their Next Generation Matrices are the same. 
+
+$$\mathbf{NGM } = \left[\begin{array}
+{rrr}
+\frac{\beta_L}{\gamma_L} & \frac{\beta_L \alpha_{LM}}{\gamma_M} & \frac{\beta_L \alpha_{LH}}{\gamma_H} \\
+\frac{\beta_M \alpha_{ML}}{\gamma_L} &  \frac{\beta_M}{\gamma_M} & \frac{\beta_M \alpha_{MH}}{\gamma_H} \\
+\frac{\beta_H \alpha_{HL}}{\gamma_L} & \frac{\beta_H \alpha_{HM}}{\gamma_M} & \frac{\beta_H}{\gamma_H}
+\end{array}\right]
+$$
+
+```{r R0, echo=FALSE}
+rep_number <- R0(alpha, rec, ro)
+```
+Using the parameters defined above the Ro value for the three patch model is **`r rep_number`** 
+
+**Model with vaccination** 
+ 
+ After including vaccination on each path the next generation matrix is:
+
+$$\mathbf{NGM } = \left[\begin{array}
+{rrr}
+\frac{\beta_L (1-C_L)}{\gamma_L} & \frac{\beta_L \alpha_{LM} (1-C_L)}{\gamma_M} & \frac{\beta_L \alpha_{LH}(1-C_L)}{\gamma_H} \\
+\frac{\beta_M \alpha_{ML}(1-C_M)}{\gamma_L} &  \frac{\beta_M (1-C_M)}{\gamma_M} & \frac{\beta_M \alpha_{MH}(1-C_M)}{\gamma_H} \\
+\frac{\beta_H \alpha_{HL}(1-C_H)}{\gamma_L} & \frac{\beta_H \alpha_{HM}(1-C_H)}{\gamma_M} & \frac{\beta_H (1-C_H)}{\gamma_H}
+\end{array}\right]
+$$
+
+Assuming the same coverage for each patch the figure below shows the change in Ro at different coverage levels.The minimun coverage required to eliminate the disease is: **`r 1-(1/rep_number)`**
+
+```{r R0_scan, echo=FALSE}
+cov_range <- seq(0, 1, length.out = 100)
+ro_vec <- data.frame(matrix(0, nrow = length(cov_range), ncol = 1))
+
+
+for (i in c(1:length(cov_range))) {
+  cov <- c(cov_range[i], cov_range[i], cov_range[i])
+  
+  ro_vec[i, 1] <- R0_vacc(alpha, rec, ro, cov)
+  
+}
+
+ro_vec [, 2] <- cov_range
+colnames(ro_vec) <- c("ro", "cov")
+
+# Plotting the model
+ggplot(ro_vec, aes(x = cov, y = ro)) + geom_line() + xlab(("Coverage")) + ylab ("Ro") #+ coord_cartesian(xlim=c(0, 0.9))
+
+```
+
+#### SIR MODEL 
+
+When the patches have a SIR disease dynamics it is possible to estimated the outbreak size or the total number of people infected during an outbreak: 
+
+```{r basic_model, message=FALSE, warning=FALSE, error= FALSE,results="hide"}
+
+## ----- Basic SIR model  ---->
+
+sir_mult <- runModel("sir_mult.R",tt,np = npop,N = N,rec = rec,ro = ro,alpha = alpha,I0 = I0)
+
+outbreakSize <- tail(sir_mult, 1)[1, 11:13]
+colnames(outbreakSize) <- c("Low transmission", "Medium transmission", "High transmission")
+
+outbreakSize <- as.numeric (outbreakSize)
+
+```
+Low transmission| Medium transmission | High transmision
+----------------| --------------------| ----------------        
+`r signif(outbreakSize[1], digits = 4)` |  `r signif(outbreakSize[2], digits = 4)` | `r signif(outbreakSize[3], digits = 4)``
+
+**Including vaccination:** 
+
+When vaccination is included and coverages is the same for all the patches, the fraction of cases averted varies as follows
+
+```{r SIR_Vacc_cov, echo=FALSE, message=FALSE, warning=FALSE, error= FALSE, results="hide"}
+
+cov_range <- seq(0, 1, length.out = 100)
+cases_averted <-   data.frame(matrix(1, nrow = length(cov_range), ncol = 3))
+colnames (cases_averted) <- c("Low", "Medium", "High")
+
+for (i in c(1:length(cov_range))) {
+  cov <- c(cov_range[i], cov_range[i], cov_range[i])
+  R0 <- cov * N
+  
+  tryCatch({
+    sir_vacc <- runModel("SIR_vacc.R", tt,np = npop,N = N, rec = rec,ro = ro, alpha = alpha, I0 = I0,cov = cov, vacc_time = 1,R0 = R0)
+  }, error = function(e) {
+   cat("ERROR :", conditionMessage(e), "\n")
+  })
+  
+  outbreakSize_vacc <- as.numeric(tail(sir_vacc, 1)[1, 11:13])
+  
+  cases_averted[i, ] <- 100 * (outbreakSize - outbreakSize_vacc) / outbreakSize
+  
+}
+
+cases_averted [, 4] <- cov_range
+sir_averted = melt(cases_averted, id.vars = "V4")
+# Plotting the model
+ggplot(sir_averted, aes(x = V4, y = value, col = variable)) + geom_line() + xlab(("Coverage")) + ylab ("% Cases averted") + labs(colour = "Patch")
+
+
+```
+
+#### SIS Model 
+
+When there is a SIS disease dynamics the endemic state of the disease can be estimated:  
+
+```{r SIS_SS}
+#Steady state
+ss <- multiroot(f = SS_SIS, start = c(1e6, 1e6, 1e6), alpha = alpha, ro = ro, rec = rec,N = N)
+endemic <- ss$root 
+
+```
+
+Low transmission| Medium transmission | High transmision
+----------------| --------------------| ----------------        
+`r signif(endemic[1], digits = 4)` |  `r signif(endemic[2], digits = 4)` | `r signif(endemic[3], digits = 4)`
+
+**Including vaccination:**
+
+When vaccination is included with equal coverage on each patch the number of cases averted at the steady is: 
+
+```{r SIS_coverage, echo=FALSE}
+
+cov_range <- seq(0, 1, length.out = 100)
+cases_averted_sis <- data.frame(matrix(0, nrow = length(cov_range), ncol = 3))
+colnames (cases_averted_sis) <- c("Low", "Medium", "High")
+
+for (i in c(1:length(cov_range))) {
+  
+  cov <- c(cov_range[i], cov_range[i], cov_range[i])
+  
+  ss_vacc <-  multiroot(f = SS_SIS_Vacc, start = c(1e6, 1e6, 1e6),alpha = alpha, ro = ro,rec = rec,N = N,cov = cov)
+  
+  I_vacc <- ss_vacc$root
+  
+  cases_averted_sis [i, ] <- 100 * (ss$root - ss_vacc$root) / ss$root
+}
+
+cases_averted_sis [, 4] <- cov_range
+sis_averted = melt(cases_averted_sis, id.vars = "V4")
+# Plotting the model
+ggplot(sis_averted, aes(x = V4, y = value, col = variable)) + geom_line() + xlab(("Coverage")) + ylab ("% Cases averted") + labs(colour = "Patch")#+ coord_cartesian(xlim=c(0, 0.9))
+
+
+```
+
+### Limited number of vaccines: 
+
+**R0**
+
+```{r optim_r0}
+
+# Algorithms that work: NLOPT_LN_COBYLA - NLOPT_GN_ISRES - NLOPT_GN_DIRECT - NLOPT_GN_DIRECT_L
+
+cov_0 <- c(0.5,0.5,0.5)
+opts <- list("algorithm" = "NLOPT_GN_ISRES", "xtol_rel" = 1.0e-8)
+Vmax <- 2e6
+
+R0_min <- nloptr(x0 = cov_0,eval_f = f_min,eval_g_ineq = g_min, lb = c(0, 0, 0), ub = c(1, 1, 1), opts = opts, alpha = alpha, rec = rec,ro = ro,
+    N = N, Vmax = Vmax)
+```
+With `r signif( Vmax, digits = 3)` vaccines as a constraint, the table below shows the coverages required in each patch to reduce the reproductive number to `r R0_min$objective`.
+
+*Note: The results change with each iteration*
+
+
+Low transmission| Medium transmission | High transmision
+----------------| --------------------| ----------------        
+`r signif( R0_min$solution[1], digits = 3)` |  `r signif( R0_min$solution[2], digits = 3)` | `r signif( R0_min$solution[3], digits = 3)`
+
+
+**SIS dynamics**
+
+In the system with SIS disease dynamics the objective function maximizes the number of cases averted on the three populations 
+
+```{r optim_sis}
+
+min_sis <-  nloptr(x0 = cov_0,eval_f = sis_min, eval_g_ineq = g_min,lb = c(0, 0, 0),ub = c(1, 1, 1),opts = opts,alpha = alpha,rec = rec,
+    ro = ro,N = N,Vmax = Vmax)
+```
+
+It is possible to avert the `r -min_sis$objective*100` % of the cases, with `r signif( Vmax, digits = 3)` vaccines as a constraint, the table below shows the coverages required in each patch:
+
+
+Low transmission| Medium transmission | High transmision
+----------------| --------------------| ----------------        
+`r signif( min_sis$solution[1], digits = 3)` |  `r signif( min_sis$solution[2], digits = 3)` | `r signif( min_sis$solution[3], digits = 3)`
+
+**SIR dynamics**
+
+```{r optim_sir,message=FALSE, warning=FALSE, error= FALSE,results="hide"}
+cov_0 <- c(0.5,0.5,0.5)
+
+opts <- list("algorithm" = "NLOPT_GN_ISRES", "xtol_rel" = 1.0e-8)
+
+min_sir <- nloptr(x0 = cov_0, eval_f = sir_min , eval_g_ineq = g_min, lb = c(0, 0, 0), ub = c(1, 1, 1), opts = opts, alpha = alpha, rec = rec,
+    ro = ro,N = N,Vmax = Vmax)
+```
+
+*Note: The optimization is very sensitive to inital conditions and algorithms since ODIN may not be able to solve the system with specific coverage combinations ant the process fails*
+
+It is possible to avert the `r -min_sir$objective*100` % of the cases, with `r signif( Vmax, digits = 3)` vaccines as a constraint, the table below shows the coverages required in each patch:
+
+
+Low transmission| Medium transmission | High transmision
+----------------| --------------------| ----------------        
+`r signif( min_sir$solution[1], digits = 3)` |  `r signif( min_sir$solution[2], digits = 3)` | `r signif( min_sir$solution[3], digits = 3)`

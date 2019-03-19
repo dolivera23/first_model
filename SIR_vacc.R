@@ -42,7 +42,7 @@ lambda[] <- (beta[i] / N[i]) * sum(rows[i,])
 # Vaccination rate 
 vacc_time <- user()
 dim(delta) <- np 
-delta[] <- if(t >= vacc_time && t < vacc_time +2 ) log(1/(1-cov[i]))  else  0
+delta[] <- if(R0[i] < 1 && t >= vacc_time && t < vacc_time +2 ) log(1/(1-cov[i]))  else  0
 
 
 
