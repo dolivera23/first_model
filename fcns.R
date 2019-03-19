@@ -15,15 +15,7 @@ runModel <- function (path, tt, np, N, rec, ro, I0, alpha, ...) {
   
   # Model generator
   model_generator <- odin::odin(path_mult)
-  mod <-
-    model_generator(
-      np = np,
-      N = N,
-      rec = rec,
-      ro = ro,
-      alpha = alpha,
-      I0 = I0,
-      ...
+  mod <- model_generator(np = np,N = N, rec = rec, ro = ro, alpha = alpha,I0 = I0,...
     )
   
   # Running the model
@@ -46,11 +38,10 @@ R0 <- function (alpha, rec, ro) {
   
   # Transmission matrix
   firstRow <- c(beta[1] * alpha[1, 1] / rec[1], beta[1] * alpha[1, 2] / rec[2], beta[1] * alpha[1, 3] / rec[3])
-  secondRow <- c(beta[2] * alpha[2, 1] / rec[1], beta[2] * alpha[2, 2] / rec[2], beta[2] * alpha[2, 3] / rec[3])
-  thirdRow <- c(beta[3] * alpha[3, 1] / rec[1], beta[3] * alpha[3, 2] / rec[2], beta[3] * alpha[3, 3] / rec[3])
+  secondRow <- c(beta[2] * alpha[2, 1] / rec[1], beta[2] * alpha[2, 2]/ rec[2], beta[2] * alpha[2, 3] / rec[3])
+  thirdRow <- c(beta[3]* alpha[3, 1] / rec[1], beta[3] * alpha[3, 2] / rec[2], beta[3] * alpha[3, 3]  / rec[3])
   
-  T <-
-    as.matrix(data.frame(firstRow, secondRow, thirdRow), byrow = TRUE)
+  T <-     as.matrix(data.frame(firstRow, secondRow, thirdRow), byrow = TRUE)
   
   
   x <- eigen(T)
@@ -60,6 +51,7 @@ R0 <- function (alpha, rec, ro) {
   return(ro)
 }
 
+ 
 ### This function estimates the basic reproductive number for a metapopulation with three patches
 #   and with a SIR and SIS dynamics. It uses the Next Generation Matrix
 #   @param alpha   Matrix 3x3 with the interaction between patches
@@ -108,6 +100,7 @@ R0_vacc  <- function (alpha, rec, ro, cov) {
 
 
 SS_SIS <- function(I, alpha, rec, ro, N) {
+  
   beta <- ro * rec
   
   dIL <-
@@ -170,6 +163,8 @@ SS_SIS_Vacc <- function(I, alpha, rec, ro, cov, N) {
 f_min  <- function (cov, alpha, rec, ro, N, Vmax) {
   # Rate of infection
   beta <- ro * rec
+  
+ 
   
   
   # Transmission matrix

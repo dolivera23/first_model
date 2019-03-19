@@ -61,7 +61,7 @@ $$
 npop <- 3
 N <- c(1e6, 1e6, 1e6)
 rec <- c(0.5, 0.5, 0.5)
-ro <- c(1.2, 5, 15)
+ro <- c(1.5, 5, 15)
 alpha <-
   matrix(
     c(1, 0.1, 0.1, 0.1, 1, 0.1, 0.1, 0.1, 1),
@@ -91,7 +91,7 @@ $$\mathbf{NGM } = \left[\begin{array}
 $$
 
 ```{r R0, echo=FALSE}
-rep_number <- R0_vacc(alpha, rec, ro, c(0,0,0))
+rep_number <- R0(alpha, rec, ro)
 ```
 Using the parameters defined above the Ro value for the three patch model is **`r rep_number`** 
 
@@ -236,7 +236,7 @@ ggplot(sis_averted, aes(x = V4, y = value, col = variable)) + geom_line() + xlab
 # Algorithms that work: NLOPT_LN_COBYLA - NLOPT_GN_ISRES - NLOPT_GN_DIRECT - NLOPT_GN_DIRECT_L
 
 cov_0 <- c(0.5,0.5,0.5)
-opts <- list("algorithm" = "NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-8)
+opts <- list("algorithm" = "NLOPT_GN_ISRES", "xtol_rel" = 1.0e-8)
 Vmax <- 2e6
 
 R0_min <- nloptr(x0 = cov_0,eval_f = f_min,eval_g_ineq = g_min, lb = c(0, 0, 0), ub = c(1, 1, 1), opts = opts, alpha = alpha, rec = rec,ro = ro,

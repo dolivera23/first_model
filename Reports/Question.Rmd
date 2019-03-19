@@ -1,0 +1,133 @@
+---
+title: "Three patch model with vaccination"
+author: "Daniela Olivera"
+Date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
+
+# Load function file
+source ("fcns.R")
+
+# Installing requiered packages
+if ( !require(rootSolve)) install.packages("rootSolve")
+library(rootSolve)
+
+if ( !require(nloptr)) install.packages("nloptr")
+library("nloptr")
+
+if ( !require(ggplot2)) install.packages("ggplot2")
+library("ggplot2")
+
+```
+
+
+### The system 
+
+The system is three patch meta-population model. Each patch has its own disease dynamics (SIS o SIR) and is interconnected, as shown below.  
+
+
+<center>
+![](Patch_model.png#center){width=30%} //
+</center>
+
+**Setting up the model parameters for the model:** 
+
+1. Number of patches: _npop_
+2. Population in each patch: _N_
+3. Individual Ro: _ro_
+4. Patch recovery rate: _rec_
+5. Interaction matrix between patches: 
+$$\mathbf{\alpha } = \left[\begin{array}
+{rrr}
+1 & \alpha_{LM} & \alpha_{LH} \\
+\alpha_{ML} & 1 & \alpha_{MH} \\
+\alpha_{HL} & \alpha_{HM} & 1
+\end{array}\right]
+$$
+6. Initial conditions for simulations: _I0_
+
+
+```{r parameters}
+
+# General parameters for all the models
+npop <- 3
+N <- c(1e6, 1e6, 1e6)
+rec <- c(0.5, 0.5, 0.5)
+ro <- c(5,5,5)
+alpha <-
+  matrix(
+    c(1, 0.1, 0.1, 0.1, 1, 0.1, 0.1, 0.1, 1),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+I0 <- c(1, 1, 1)
+
+#Time
+tt <- seq(0, 100, length.out = 201)
+```
+
+
+
+#### Basic reproductive number 
+
+Here is what I've done so far: 
+
+1. Until this morning I had a vector of local Ro and recovery rates and estimate a beta for each patch:
+$$ \beta =R_o* \gamma $$
+	
+2. I used that beta on the next generation matrix
+
+$$\mathbf{NGM } = \left[\begin{array}
+{rrr}
+\frac{\beta_L}{\gamma_L} & \frac{\beta_L \alpha_{LM}}{\gamma_M} & \frac{\beta_L \alpha_{LH}}{\gamma_H} \\
+\frac{\beta_M \alpha_{ML}}{\gamma_L} &  \frac{\beta_M}{\gamma_M} & \frac{\beta_M \alpha_{MH}}{\gamma_H} \\
+\frac{\beta_H \alpha_{HL}}{\gamma_L} & \frac{\beta_H \alpha_{HM}}{\gamma_M} & \frac{\beta_H}{\gamma_H}
+\end{array}\right]
+$$
+```{r R0, echo=FALSE}
+rep_number1 <- R0_bad(alpha, rec, ro)
+
+```
+
+
+3. And using equal local $R_o =5$ the global reproductive number was **`r rep_number1`**
+
+4. As we talked this morning I modified the $\beta$ parameter so it takes into account the contacts lost due to interacionts with other patches. 
+So the new betas would be: 
+
+$$ \beta_L = \beta_L (1-\alpha_{HL}-\alpha_{ML}) $$ 
+$$ \beta_M = \beta_M (1-\alpha_{LM}-\alpha_{HM}) $$ 
+$$ \beta_H = \beta_H (1-\alpha_{LH}-\alpha_{MH}) $$ 
+
+```{r R02, echo=FALSE}
+rep_number2 <- R0_worse(alpha, rec, ro)
+
+```
+
+
+5. Using equal local $R_o =5$ and scalating the \beta the global reproductive number is **`r rep_number2`**. 
+
+6. As a second guess I  only changed the \beta on the matrix diagonal like this: 
+
+
+
+$$\mathbf{NGM } = \left[\begin{array}
+{rrr}
+\frac{\beta_L (1-\alpha_{HL}-\alpha_{ML})}{\gamma_L} & \frac{\beta_L \alpha_{LM}}{\gamma_M} & \frac{\beta_L \alpha_{LH}}{\gamma_H} \\
+\frac{\beta_M \alpha_{ML}}{\gamma_L} &  \frac{\beta_M (1-\alpha_{LM}-\alpha_{HM})}{\gamma_M} & \frac{\beta_M \alpha_{MH}}{\gamma_H} \\
+\frac{\beta_H \alpha_{HL}}{\gamma_L} & \frac{\beta_H \alpha_{HM}}{\gamma_M} & \frac{\beta_H (1-\alpha_{LH}-\alpha_{MH})}{\gamma_H}
+\end{array}\right]
+$$
+
+```{r R01, echo=FALSE}
+rep_number <- R0(alpha, rec, ro)
+
+```
+
+7. Using  this approach and local $R_o =5$ , the  global reproductive number is **`r rep_number`** as expected.
+ 

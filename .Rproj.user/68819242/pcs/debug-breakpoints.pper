@@ -1,6 +1,21 @@
 {
     "debugBreakpointsState" : {
         "breakpoints" : [
+            {
+                "editor_line_number" : 96,
+                "editor_state" : 2,
+                "function_name" : "plot_externalities",
+                "function_steps" : "",
+                "id" : 8,
+                "is_package_breakpoint" : false,
+                "is_pending_debug_completion" : false,
+                "line_number" : 96,
+                "needs_updated_steps" : false,
+                "package_name" : "",
+                "path" : "C:/Users/Daniela Olivera Mesa/OneDrive - Imperial College London/PhD/Codes/Basic model/Vaccination_externalities.R",
+                "state" : 2,
+                "type" : 0
+            }
         ]
     }
 }
