@@ -59,29 +59,28 @@ R0 <- function (alpha, rec, ro) {
 #   @param ro     Basic reproductive of each patch if it were isolated
 #   @param cov    Vaccine coverage at each path
 
-R0_vacc  <- function (alpha, rec, ro, cov) {
+R0_vacc  <- function (alpha, rec, ro, cov,ef) {
   # Rate of infection
   beta <- ro * rec
   
   # Transmission matrix
   firstRow <-
-    c((1 - cov[1]) * beta[1] * alpha[1, 1] / rec[1],
-      (1 - cov[1]) * beta[1] * alpha[1, 2] / rec[2],
-      (1 - cov[1]) * beta[1] * alpha[1, 3] / rec[3]
+    c((1 - ef*cov[1]) * beta[1] * alpha[1, 1] / rec[1],
+      (1 - ef*cov[1]) * beta[1] * alpha[1, 2] / rec[2],
+      (1 - ef*cov[1]) * beta[1] * alpha[1, 3] / rec[3]
     )
   secondRow <-
-    c((1 - cov[2]) * beta[2] * alpha[2, 1] / rec[1],
-      (1 - cov[2]) * beta[2] * alpha[2, 2] / rec[2],
-      (1 - cov[2]) * beta[2] * alpha[2, 3] / rec[3]
+    c((1 - ef*cov[2]) * beta[2] * alpha[2, 1] / rec[1],
+      (1 - ef*cov[2]) * beta[2] * alpha[2, 2] / rec[2],
+      (1 - ef*cov[2]) * beta[2] * alpha[2, 3] / rec[3]
     )
   thirdRow <-
-    c((1 - cov[3]) * beta[3] * alpha[3, 1] / rec[1],
-      (1 - cov[3]) * beta[3] * alpha[3, 2] / rec[2],
-      (1 - cov[3]) * beta[3] * alpha[3, 3] / rec[3]
+    c((1 - ef*cov[3]) * beta[3] * alpha[3, 1] / rec[1],
+      (1 - ef*cov[3]) * beta[3] * alpha[3, 2] / rec[2],
+      (1 - ef*cov[3]) * beta[3] * alpha[3, 3] / rec[3]
     )
   
-  T <-
-    as.matrix(data.frame(firstRow, secondRow, thirdRow), byrow = TRUE)
+  T <- as.matrix(data.frame(firstRow, secondRow, thirdRow), byrow = TRUE)
   
   
   x <- eigen(T)
@@ -104,16 +103,13 @@ SS_SIS <- function(I, alpha, rec, ro, N) {
   beta <- ro * rec
   
   dIL <-
-    beta[1] / N[1] * (I[1] + alpha[1, 2] * I[2] + alpha[1, 3] * I[3]) * (N[1] -
-                                                                           I[1]) - rec[1] * I[1]
+    beta[1] / N[1] * (alpha[1,1] * I[1] + alpha[1, 2] * I[2] + alpha[1, 3] * I[3]) * (N[1] - I[1]) - rec[1] * I[1]
   
   dIM <-
-    beta[2] / N[2] * (I[1] * alpha[2, 1] + I[2] + alpha[2, 3] * I[3]) * (N[2] -
-                                                                           I[2]) - rec[2] * I[2]
+    beta[2] / N[2] * (alpha[2, 1] * I[1] + alpha[2,2] * I[2]  + alpha[2, 3] * I[3]) * (N[2] - I[2]) - rec[2] * I[2]
   
   dIH <-
-    beta[3] / N[3] * (I[1] * alpha[3, 1] + I[2] * alpha[3, 2] + I[3]) * (N[3] -
-                                                                           I[3]) - rec[3] * I[3]
+    beta[3] / N[3] * (alpha[3, 1] * I[1]  + I[2] * alpha[3, 2] + alpha[3,3] * I[3]) * (N[3] - I[3]) - rec[3] * I[3]
   
   c(dIL = dIL, dIM = dIM, dIH = dIH)
   
@@ -125,21 +121,17 @@ SS_SIS <- function(I, alpha, rec, ro, N) {
 #   @param rec     Recovery rates for each path
 #   @param ro     Basic reproductive of each patch if it were isolated
 #   @param cov    Vaccine coverage at each path
+#   @param ef      Vaccine effectiveness
 
-SS_SIS_Vacc <- function(I, alpha, rec, ro, cov, N) {
+SS_SIS_Vacc <- function(I,alpha,ef,ro,rec,N,cov) {
+  
   beta <- ro * rec
   
-  dIL <-
-    beta[1] / N[1] * (I[1] + alpha[1, 2] * I[2] + alpha[1, 3] * I[3]) * (N[1] *
-                                                                           (1 - cov[1]) - I[1]) - rec[1] * I[1]
+  dIL <- beta[1] / N[1] * (alpha[1,1] * I[1] + alpha[1, 2] * I[2] + alpha[1, 3] * I[3]) * (N[1] * (1 - ef * cov[1]) - I[1]) - rec[1] * I[1]
   
-  dIM <-
-    beta[2] / N[2] * (I[1] * alpha[2, 1] + I[2] + alpha[2, 3] * I[3]) * (N[2] *
-                                                                           (1 - cov[2]) - I[2]) - rec[2] * I[2]
+  dIM <- beta[2] / N[2] * (alpha[2, 1] * I[1] + alpha[2,2] * I[2]  + alpha[2, 3] * I[3]) * (N[2] * (1 - ef * cov[2]) - I[2]) - rec[2] * I[2]
   
-  dIH <-
-    beta[3] / N[3] * (I[1] * alpha[3, 1] + I[2] * alpha[3, 2] + I[3]) * (N[3] *
-                                                                           (1 - cov[3]) - I[3]) - rec[3] * I[3]
+  dIH <- beta[3] / N[3] * (alpha[3, 1] * I[1]  + I[2] * alpha[3, 2] + alpha[3,3] * I[3]) * (N[3] * (1 - ef * cov[3]) - I[3]) - rec[3] * I[3]
   
   c(dIL = dIL, dIM = dIM, dIH = dIH)
   
@@ -159,33 +151,30 @@ SS_SIS_Vacc <- function(I, alpha, rec, ro, cov, N) {
 #   @param ro     Basic reproductive of each patch if it were isolated
 #   @param N      Population size of each path
 #   @param Vmax   Number of avaialbe vaccines
+#   @param ef      Vaccine effectivness 
 
-f_min  <- function (cov, alpha, rec, ro, N, Vmax) {
+f_min  <- function (cov, alpha, rec, ro, ef, N, Vmax) {
   # Rate of infection
   beta <- ro * rec
   
- 
-  
-  
   # Transmission matrix
   firstRow <-
-    c((1 - cov[1]) * beta[1] * alpha[1, 1] / rec[1],
-      (1 - cov[1]) * beta[1] * alpha[1, 2] / rec[2],
-      (1 - cov[1]) * beta[1] * alpha[1, 3] / rec[3]
+    c((1 - ef*cov[1]) * beta[1] * alpha[1, 1] / rec[1],
+      (1 - ef*cov[1]) * beta[1] * alpha[1, 2] / rec[2],
+      (1 - ef*cov[1]) * beta[1] * alpha[1, 3] / rec[3]
     )
   secondRow <-
-    c((1 - cov[2]) * beta[2] * alpha[2, 1] / rec[1],
-      (1 - cov[2]) * beta[2] * alpha[2, 2] / rec[2],
-      (1 - cov[2]) * beta[2] * alpha[2, 3] / rec[3]
+    c((1 - ef*cov[2]) * beta[2] * alpha[2, 1] / rec[1],
+      (1 - ef*cov[2]) * beta[2] * alpha[2, 2] / rec[2],
+      (1 - ef*cov[2]) * beta[2] * alpha[2, 3] / rec[3]
     )
   thirdRow <-
-    c((1 - cov[3]) * beta[3] * alpha[3, 1] / rec[1],
-      (1 - cov[3]) * beta[3] * alpha[3, 2] / rec[2],
-      (1 - cov[3]) * beta[3] * alpha[3, 3] / rec[3]
+    c((1 - ef*cov[3]) * beta[3] * alpha[3, 1] / rec[1],
+      (1 - ef*cov[3]) * beta[3] * alpha[3, 2] / rec[2],
+      (1 - ef*cov[3]) * beta[3] * alpha[3, 3] / rec[3]
     )
   
-  T <-
-    as.matrix(data.frame(firstRow, secondRow, thirdRow), byrow = TRUE)
+  T <- as.matrix(data.frame(firstRow, secondRow, thirdRow), byrow = TRUE)
   
   
   x <- eigen(T)
@@ -207,7 +196,7 @@ f_min  <- function (cov, alpha, rec, ro, N, Vmax) {
 #   @param Vmax   Number of avaialbe vaccines
 
 
-sis_min <- function(cov, alpha, rec, ro, N, Vmax) {
+sis_min <- function(cov, alpha, rec, ro, N,ef, Vmax) {
   
   library ("rootSolve")
   
@@ -228,7 +217,8 @@ sis_min <- function(cov, alpha, rec, ro, N, Vmax) {
     ro = ro,
     rec = rec,
     N = N,
-    cov = cov
+    cov = cov,
+    ef = ef 
   )
   
   cases_averted <- -(sum((ss$root- ss_vacc$root))/sum(ss$root))
@@ -247,16 +237,16 @@ sis_min <- function(cov, alpha, rec, ro, N, Vmax) {
 #   @param Vmax   Number of avaialbe vaccines
 
 
-sir_min <- function(cov, alpha, rec, ro, N, Vmax) {
+sir_min <- function(cov, alpha, rec, ro,ef,  N, Vmax) {
   
   npop <- 3
   I0 <- c(1,1,1)
-  R0 <- cov * N
+  R0 <- cov * N * ef
   
   sir_mult <- runModel("sir_mult.R", tt, alpha=alpha,rec=rec,ro=ro,N=N, np=npop, I0=I0 )
   outbreakSize <- as.numeric(tail(sir_mult, 1)[1,11:13])
   
-  sir_vacc <- runModel("SIR_vacc.R", tt,np=npop, N=N, rec=rec, ro=ro,alpha=alpha,I0=I0, cov=cov, vacc_time=1, R0=R0 )
+  sir_vacc <- runModel("SIR_vacc.R", tt,np=npop, N=N, rec=rec, ro=ro,alpha=alpha,I0=I0, cov=cov, vacc_time=1, R0=R0, ef=ef)
   outbreakSize_vacc <- as.numeric(tail(sir_vacc, 1)[1,11:13])
   
  
@@ -273,8 +263,11 @@ sir_min <- function(cov, alpha, rec, ro, N, Vmax) {
 #   @param rec     Recovery rates for each path
 #   @param ro     Basic reproductive of each patch if it were isolated
 #   @param N      Population size of each path
+#   @param ef     Vaccine effectiveness
 #   @param Vmax   Number of avaialbe vaccines
 
-g_min <- function (cov, alpha, rec, ro, N, Vmax) {
+g_min <- function (cov, alpha, rec, ro, N,ef, Vmax) {
   return (cov[1] * N[1] + cov[2] * N[2] + cov[3] * N[3] - Vmax)
 }
+
+

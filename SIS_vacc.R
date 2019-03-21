@@ -4,9 +4,9 @@ np<- user(3)               #  Number of populations to be modelled
 dim(S) <- np
 dim(I) <- np
 dim(V) <- np
-deriv(S[1:np]) <- - lambda[i]*S[i] - delta[i]* S[i] + rec[i]*I[i]
+deriv(S[1:np]) <- - lambda[i]*S[i] - delta[i]*ef* S[i] + rec[i]*I[i]
 deriv(I[1:np]) <- lambda[i]*S[i] - rec[i]*I[i] - delta[i]* I[i] 
-deriv(V[1:np]) <-  delta[i] * S[i] + delta[i]* I[i]
+deriv(V[1:np]) <-  delta[i] * S[i] + delta[i]*ef* I[i]
 
 # -------- Initial conditions -------- #
 
@@ -22,6 +22,7 @@ rec[] <-user()              #  Recovery rate on each patch
 ro[] <- user()              #  Reproductive number on each patch  
 cov[] <- user()             #  Vaccination coverage on each patch 
 vacc_time <- user()
+ef <- user()                 # Vaccine efficacy
 
 
 # Force of infection

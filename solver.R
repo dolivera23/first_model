@@ -7,13 +7,8 @@ npop <- 3
 N <- c(1e6, 1e6, 1e6)
 rec <- c(0.5, 0.5, 0.5)
 ro <- c(1.2, 5, 15)
-alpha <-
-  matrix(
-    c(1, 0.7, 0.3, 0.7, 1, 0.7, 0.3, 0.7, 1),
-    nrow = 3,
-    ncol = 3,
-    byrow = TRUE
-  )
+alpha <-  matrix(c(0.95, 0.02, 0.03, 0.02, 0.96, 0.02, 0.03, 0.02, 0.95), nrow = 3,  ncol = 3,byrow = TRUE)
+ef <- 1
 I0 <- c(1, 1, 1)
 
 #Time
@@ -27,42 +22,30 @@ tt <- seq(0, 100, length.out = 201)
 ## ----- Basic SIR model  ---->
 
 sir_mult <-   runModel(
-    "sir_mult.R",
-    tt,
-    np = npop,
-    N = N,
-    rec = rec,
-    ro = ro,
-    alpha = alpha,
-    I0 = I0
-  )
+  "sir_mult.R",
+  tt,
+  np = npop,
+  N = N,
+  rec = rec,
+  ro = ro,
+  alpha = alpha,
+  I0 = I0
+)
 
 outbreakSize <- as.numeric(tail(sir_mult, 1)[1, 11:13])
 
 # Plotting the model
 sir_mult_long = melt(sir_mult, id.vars = "t")
-ggplot(sir_mult_long, aes(x = t, y = value, col = variable)) + geom_line() + coord_cartesian(xlim =
-                                                                                               c(0, 20))
+ggplot(sir_mult_long, aes(x = t, y = value, col = variable)) + geom_line() # + coord_cartesian(xlim = c(0, 20))
 
 
 ## --------- Vaccination SIR model ---->
 
-cov <- 1 - 1 / ro
-R0 <- cov * N   #Initialpopulation recovered 
+cov <- c(0.5,0.5,0.5)
 
-sir_vacc <- runModel(
-    "SIR_vacc.R",
-    tt,
-    np = npop,
-    N = N,
-    rec = rec,
-    ro = ro,
-    alpha = alpha,
-    I0 = I0,
-    cov = cov,
-    vacc_time = 1,
-    R0 = R0
-  )
+R0 <- cov * N * ef  # Initialpopulation recovered 
+
+sir_vacc <- runModel("SIR_vacc.R",tt,np = npop,N = N, rec = rec,ro = ro,alpha = alpha, I0 = I0,  cov = cov,  vacc_time = 1, ef=ef, R0 = R0  )
 
 # Plotting the model
 sir_vacc_long = melt(sir_vacc, id.vars = "t")
@@ -72,27 +55,18 @@ ggplot(sir_vacc_long, aes(x = t, y = value, col = variable)) + geom_line()#+ coo
 #  ------------ Different coverages:
 
 cov_range <- seq(0, 1, length.out = 100)
-cases_averted <-
-  data.frame(matrix(1, nrow = length(cov_range), ncol = 3))
+cases_averted <- data.frame(matrix(1, nrow = length(cov_range), ncol = 3))
 colnames (cases_averted) <- c("Low", "Medium", "High")
 
 for (i in c(1:length(cov_range))) {
   cov <- c(cov_range[i], cov_range[i], cov_range[i])
-  R0 <- cov * N
+  R0 <- cov * N * ef
   
-  #tryCatch({
-    print(i)
-    
-    sir_vacc <- runModel("SIR_vacc.R",tt, np = npop, N = N, rec = rec, ro = ro,  alpha = alpha, I0 = I0,cov = cov, vacc_time = 1, R0 = R0)
-    
- # }, error = function(e) {
-  #  cat("ERROR :", conditionMessage(e), "\n")
- # })
   
+  sir_vacc <- runModel("SIR_vacc.R",tt, np = npop, N = N, rec = rec, ro = ro,  alpha = alpha, I0 = I0,cov = cov, vacc_time = 1, ef=ef, R0 = R0)
   outbreakSize_vacc <- as.numeric(tail(sir_vacc, 1)[1, 11:13])
   
-  cases_averted[i, ] <-
-    100 * (outbreakSize - outbreakSize_vacc) / outbreakSize
+  cases_averted[i, ] <- 100 * (outbreakSize - outbreakSize_vacc) / outbreakSize
   
 }
 
@@ -110,29 +84,11 @@ ggplot(sir_averted, aes(x = V4, y = value, col = variable)) + geom_line() + xlab
 
 #Steady state
 library ("rootSolve")
-ss <-
-  multiroot(
-    f = SS_SIS,
-    start = c(1e6, 1e6, 1e6),
-    alpha = alpha,
-    ro = ro,
-    rec = rec,
-    N = N
-  )
+ss <- multiroot(f = SS_SIS,start = c(1e6, 1e6, 1e6),alpha = alpha, ro = ro,rec = rec,  N = N)
 
 
 # Dinamic model
-sis_mult <-
-  runModel(
-    "sis.R",
-    tt,
-    np = npop,
-    N = N,
-    rec = rec,
-    ro = ro,
-    alpha = alpha,
-    I0 = I0
-  )
+sis_mult <- runModel("sis.R",tt,np = npop,N = N,rec = rec,ro = ro,alpha = alpha,I0 = I0)
 
 # Plotting the dynamic  model
 sis_long = melt(sis_mult, id.vars = "t")
@@ -140,47 +96,24 @@ ggplot(sis_long, aes(x = t, y = value, col = variable)) + geom_line()
 
 ## --------- Vaccination SIS model ------->
 
-cov <- 1 - 1 / ro
-
 # Solving steady state
-ss_vacc <-
-  multiroot(
-    f = SS_SIS_Vacc,
-    start = c(1e6, 1e6, 1e6),
-    alpha = alpha,
-    ro = ro,
-    rec = rec,
-    N = N,
-    cov = cov
-  )
+
+ss_vacc <-  multiroot(f = SS_SIS_Vacc , start = c(1e6, 1e6, 1e6), ef = ef, alpha = alpha, ro = ro, rec = rec,  N = N, cov =cov)
+
 
 # Dynamic model
 I0_SIS <- as.numeric(tail(sis_mult, 1)[1, 5:7])
-sis_vacc <-
-  runModel(
-    "SIS_vacc.R",
-    tt,
-    np = npop,
-    N = N,
-    rec = rec,
-    ro = ro,
-    alpha = alpha,
-    I0 = I0_SIS,
-    cov = cov,
-    vacc_time = 20
-  )
+sis_vacc <- runModel( "SIS_vacc.R", tt,np = npop,N = N,rec = rec,ro = ro,alpha = alpha,I0 = I0_SIS,cov = cov, ef=ef,vacc_time = 20)
 
 # Plotting the model
 sis_vacc_long = melt(sis_vacc, id.vars = "t")
-ggplot(sis_vacc_long, aes(x = t, y = value, col = variable)) + geom_line() +
-  coord_cartesian(xlim = c(19, 27))
+ggplot(sis_vacc_long, aes(x = t, y = value, col = variable)) + geom_line() #+ coord_cartesian(xlim = c(19, 27))
 
 
 # -------------  Different coverages ----->
 
 cov_range <- seq(0, 1, length.out = 100)
-cases_averted_sis <-
-  data.frame(matrix(0, nrow = length(cov_range), ncol = 3))
+cases_averted_sis <-  data.frame(matrix(0, nrow = length(cov_range), ncol = 3))
 colnames (cases_averted_sis) <- c("Low", "Medium", "High")
 
 for (i in c(1:length(cov_range))) {
@@ -194,7 +127,8 @@ for (i in c(1:length(cov_range))) {
       ro = ro,
       rec = rec,
       N = N,
-      cov = cov
+      cov = cov,
+      ef = ef
     )
   
   I_vacc <- ss_vacc$root
@@ -219,7 +153,7 @@ ro_vec <- data.frame(matrix(0, nrow = length(cov_range), ncol = 1))
 for (i in c(1:length(cov_range))) {
   cov <- c(cov_range[i], cov_range[i], cov_range[i])
   
-  ro_vec[i, 1] <- R0_vacc(alpha, rec, ro, cov)
+  ro_vec[i, 1] <- R0_vacc(alpha, rec, ro, cov,ef)
   
 }
 
@@ -243,32 +177,32 @@ library("nloptr")
 # NLOPT_LN_COBYLA - NLOPT_GN_ISRES - NLOPT_GN_DIRECT - NLOPT_GN_DIRECT_L
 
 cov_0 <- c(0.5,0.5,0.5)
-opts <- list("algorithm" = "NLOPT_GN_DIRECT_L", "xtol_rel" = 1.0e-8)
+opts <- list("algorithm" = "NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-8)
 
 R0_min <- nloptr(
-    x0 = cov_0,
-    eval_f = f_min,
-    eval_g_ineq = g_min,
-    lb = c(0, 0, 0),
-    ub = c(1, 1, 1),
-    opts = opts,
-    alpha = alpha,
-    rec = rec,
-    ro = ro,
-    N = N,
-    Vmax = 1.5e6
-  )
+  x0 = cov_0,
+  eval_f = f_min,
+  eval_g_ineq = g_min,
+  lb = c(0, 0, 0),
+  ub = c(1, 1, 1),
+  opts = opts,
+  alpha = alpha,
+  rec = rec,
+  ro = ro,
+  N = N,
+  ef=ef,
+  Vmax = 1.5e6
+)
 
 min_sis <- nloptr(x0 = cov_0, eval_f = sis_min ,eval_g_ineq = g_min,lb = c(0, 0, 0),ub = c(1, 1, 1),opts = opts,alpha = alpha,rec = rec,ro = ro,
-    N = N,Vmax = 2e6
-  )
+                  N = N, ef=ef,Vmax = 2e6)
 
 cov_0 <- c(0.9,0.9,0.9)
 
 opts <- list("algorithm" = "NLOPT_LN_COBYLA", "xtol_rel" = 1.0e-8)
 
 min_sir <- nloptr(x0 = cov_0, eval_f = sir_min , eval_g_ineq = g_min, lb = c(0, 0, 0), ub = c(1, 1, 1), opts = opts, alpha = alpha, rec = rec,
-                  ro = ro,N = N,Vmax = 2e6)
+                  ro = ro,N = N,ef=ef,Vmax = 2e6)
 
 
 

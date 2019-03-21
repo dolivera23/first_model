@@ -6,13 +6,14 @@ library("ggpubr")
 
 ## ----- Parameters ----- ##
 Vmax<- 3e6
-vaccine <- seq(0,Vmax,100)
+vaccine <- seq(0,Vmax,20)
 
 npop <- 3
 N <- c(1e6, 1e6, 1e6)
 rec <- c(0.5, 0.5, 0.5)
 ro <- c(1.5,5,15)
 alpha <-  matrix(c(0.95, 0.02, 0.03, 0.02, 0.96, 0.02, 0.03, 0.02, 0.95), nrow = 3,  ncol = 3,byrow = TRUE)
+ef <- 1
 I0 <- c(1, 1, 1)
 
 
@@ -47,11 +48,11 @@ outbreakSize <- as.numeric (outbreakSize)
 for (i in 1:length(vaccine)){
   
   cov <- vaccine[i]/(3*N)        # Assuming equal distribution of vaccines so far 
-  R0 <- cov * N                  # Initial population of recovered people for the SIR model
+  R0 <- cov * N * ef                 # Initial population of recovered people for the SIR model
   
   
   # SIS model: 
-  ss_vacc <-  multiroot(f = SS_SIS_Vacc, start = c(1e6, 1e6, 1e6),alpha = alpha, ro = ro,rec = rec,N = N,cov = cov)
+  ss_vacc <-  multiroot(f = SS_SIS_Vacc, start = c(1e6, 1e6, 1e6),alpha = alpha, ro = ro,rec = rec,N = N,cov = cov, ef=ef)
   vacc_out[i,c(2,3,4)] <- (endemic - ss_vacc$root)
   vacc_out[i,5] <- sum((endemic - ss_vacc$root))
   
@@ -60,7 +61,7 @@ for (i in 1:length(vaccine)){
   pv_out[i,5] <- (sum(ss_vacc$root - I0)) / (sum((N-I0)))
   
   # SIR model: 
-  sir_vacc <- runModel("SIR_vacc.R", tt,np = npop,N = N, rec = rec,ro = ro, alpha = alpha, I0 = I0,cov = cov, vacc_time = 1,R0 = R0)
+  sir_vacc <- runModel("SIR_vacc.R", tt,np = npop,N = N, rec = rec,ro = ro, alpha = alpha, I0 = I0,cov = cov, vacc_time = 1,R0 = R0, ef=ef)
   outbreakSize_vacc <- as.numeric(tail(sir_vacc, 1)[1, 11:13])
   
   vacc_out[i,c(6,7,8)] <- (outbreakSize - outbreakSize_vacc)
@@ -109,6 +110,12 @@ p_pv_SIR <- plot_externalities(pv_out, c(1,6,7,8),2:length(vaccine), "Vaccine", 
 
 ggarrange(ggarrange(p_pv_SIS, p_pv_SIR, ncol = 2, labels = c("A", "B")), p_pv,nrow = 2)
 
-
-
+# d_peak <- peak
+# for (i in 2:length(peak[,1])){
+#   
+#   
+#   d_peak[i,] <- peak [i,]- peak [i-1,]
+#   
+#   
+# }
 
