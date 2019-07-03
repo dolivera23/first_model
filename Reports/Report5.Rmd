@@ -1,0 +1,641 @@
+---
+title: "Report 5 - Vaccination externalities"
+author: "Daniela Olivera"
+Date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+options(width = 2000)
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
+
+# Load function file
+source ("../fcns.R")
+
+# Installing requiered packages
+if ( !require(rootSolve)) install.packages("rootSolve")
+library(rootSolve)
+
+
+if ( !require(ggplot2)) install.packages("ggplot2")
+library("ggplot2")
+
+
+
+if ( !require(ggplot2)) install.packages("ggpubr")
+library("ggpubr")
+```
+
+**Setting up the model parameters for the model:** 
+
+1. Number of patches: _npop_
+2. Population in each patch: _N_
+3. Individual Ro: _ro_ &rarr; 1.5 -3- 9
+4. Patch recovery rate: _rec_
+5. Interaction matrix between patches:  **Rows of the marix must sum 1**
+$$\mathbf{\alpha } = \left[\begin{array}
+{rrr}
+\alpha_{LL} & \alpha_{LM} & \alpha_{LH} \\
+\alpha_{ML} & \alpha_{MM} & \alpha_{MH} \\
+\alpha_{HL} & \alpha_{HM} & \alpha_{HH}
+\end{array}\right]
+$$
+6. Maximum number of vaccine available: _Vmax_
+7. Vaccine distribution among patches: *vacc_distr*
+
+```{r parameters}
+npop <- 3
+N <- c(1e6, 1e6, 1e6)
+rec <- c(0.5, 0.5, 0.5)
+ro <- c(1.5,3,9)
+ef <- 1
+I0 <- c(1, 1, 1)
+
+```
+#### First Scenario: 
+
+* Vaccine is avaialbe for all the population.
+* The vaccine are distributed equally.
+* There is NO connectivity between patches. 
+
+$$\mathbf{\alpha } = \left[\begin{array}
+{rrr}
+1&  0& 0 \\
+0 & 1 & 0 \\
+0 & 0 & 1  
+\end{array}\right]
+$$ 
+
+```{r param_change}
+
+Vmax<- 3e6
+
+alpha <-matrix(c(1, 0,0,0,1,0,0,0,1), nrow = 3,  ncol = 3,byrow = TRUE) 
+
+vacc_distr <- c(1/3,1/3,1/3)
+
+```
+
+```{r externalities1, echo=FALSE, message=FALSE, warning=FALSE, error= FALSE}
+
+ext <- vacc_externalities(npop=npop, alpha=alpha, rec=rec, ro=ro, N=N,ef=ef, I0=I0,Vmax=Vmax,vacc_distr=vacc_distr)
+
+vaccine <- ext[,1]
+
+MEV <- ext[,c(1:12)]
+
+for (i in 2:length(vaccine)){
+  
+  MEV[i, c(5,6,7)] <-(ext[i, c(5,6,7)] - ext[i-1, c(5,6,7)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  MEV[i, c(8,12)] <- (ext[i, c(8,12)] - ext[i-1, c(8,12)]) / (ext[i,1] - ext[i-1,1])
+  MEV[i, c(9,10,11)] <-(ext[i, c(9,10,11)] - ext[i-1, c(9,10,11)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  
+  
+}
+
+pv_out <- ext[c(1:4,13:20)]
+
+## ---- Plotting ---- ##
+
+# SIS 
+
+x <- MEV[2:(length(vaccine) -1),c(2,5)]
+x[,3] <- pv_out[2:(length(vaccine) -1),5]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV", "Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,6)]
+y[,3] <- pv_out[2:(length(vaccine) -1),6]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV", "Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,7)]
+z[,3] <- pv_out[2:(length(vaccine) -1),7]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+plot_SIS <- rbind(x,y,z)
+plot_SIS[5] <- plot_SIS[,2] - plot_SIS[,3]
+colnames(plot_SIS)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+#SIR 
+
+x <- MEV[2:(length(vaccine) -1),c(2,9)]
+x[,3] <- pv_out[2:(length(vaccine) -1),9]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV","Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,10)]
+y[,3] <- pv_out[2:(length(vaccine) -1),10]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV","Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,11)]
+z[,3] <- pv_out[2:(length(vaccine) -1),11]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+
+plot_SIR <- rbind(x,y,z)
+plot_SIR[5] <- plot_SIR[,2] - plot_SIR[,3]
+colnames(plot_SIR)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+last_row <- length(vaccine) -1 
+
+p_MEV_SIR <- ggplot(plot_SIR, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none") +scale_colour_brewer(palette="Dark2")
+p_pv_SIR <-  ggplot(plot_SIR, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none")+ scale_colour_brewer(palette="Dark2")
+p_ext_SIR <- ggplot(plot_SIR, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("Marginal externality") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+
+multiplot(p_MEV_SIR,p_pv_SIR,p_ext_SIR,cols=3) 
+
+
+p_MEV_SIS <- ggplot(plot_SIS, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none") + scale_colour_brewer(palette="Dark2") 
+p_pv_SIS <-  ggplot(plot_SIS, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none")+ scale_colour_brewer(palette="Dark2")
+p_ext_SIS <- ggplot(plot_SIS, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinaions") + ylab("Marginal externality") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+
+multiplot(p_MEV_SIS,p_pv_SIS,p_ext_SIS,cols=3) 
+
+
+
+
+
+
+
+```
+
+
+
+#### Second Scenario: 
+
+* Enough vaccines for all population.
+* The vaccine are distributed equally.
+* Patches with connectivity.
+
+$$\mathbf{\alpha } = \left[\begin{array}
+{rrr}
+0.95&   0.02 & 0.03 \\
+0.02 & 0.96 & 0.02 \\
+0.03 & 0.02 & 0.95 
+\end{array}\right]
+$$ 
+
+
+
+
+```{r alpha_change}
+alpha <-matrix(c(0.95, 0.02, 0.03, 0.02, 0.96, 0.02, 0.03, 0.02, 0.95), nrow = 3,  ncol = 3,byrow = TRUE)
+
+```
+```{r externalities2, echo=FALSE, message=FALSE, warning=FALSE, error= FALSE}
+ext <- vacc_externalities(npop=npop, alpha=alpha, rec=rec, ro=ro, N=N,ef=ef, I0=I0,Vmax=Vmax,vacc_distr=vacc_distr)
+
+vaccine <- ext[,1]
+
+MEV <- ext[,c(1:12)]
+
+for (i in 2:length(vaccine)){
+  
+  MEV[i, c(5,6,7)] <-(ext[i, c(5,6,7)] - ext[i-1, c(5,6,7)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  MEV[i, c(8,12)] <- (ext[i, c(8,12)] - ext[i-1, c(8,12)]) / (ext[i,1] - ext[i-1,1])
+  MEV[i, c(9,10,11)] <-(ext[i, c(9,10,11)] - ext[i-1, c(9,10,11)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  
+  
+}
+
+pv_out <- ext[c(1:4,13:20)]
+
+## ---- Plotting ---- ##
+
+# SIS 
+
+x <- MEV[2:(length(vaccine) -1),c(2,5)]
+x[,3] <- pv_out[2:(length(vaccine) -1),5]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV", "Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,6)]
+y[,3] <- pv_out[2:(length(vaccine) -1),6]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV", "Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,7)]
+z[,3] <- pv_out[2:(length(vaccine) -1),7]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+plot_SIS <- rbind(x,y,z)
+plot_SIS[5] <- plot_SIS[,2] - plot_SIS[,3]
+colnames(plot_SIS)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+#SIR 
+
+x <- MEV[2:(length(vaccine) -1),c(2,9)]
+x[,3] <- pv_out[2:(length(vaccine) -1),9]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV","Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,10)]
+y[,3] <- pv_out[2:(length(vaccine) -1),10]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV","Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,11)]
+z[,3] <- pv_out[2:(length(vaccine) -1),11]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+
+plot_SIR <- rbind(x,y,z)
+plot_SIR[5] <- plot_SIR[,2] - plot_SIR[,3]
+colnames(plot_SIR)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+last_row <- length(vaccine) -1 
+
+p_MEV_SIR <- ggplot(plot_SIR, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_pv_SIR<-  ggplot(plot_SIR, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_ext_SIR <- ggplot(plot_SIR, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("Marginal Externality") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+
+p_MEV_SIS <- ggplot(plot_SIS, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_pv_SIS<-  ggplot(plot_SIS, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_ext_SIS<- ggplot(plot_SIS, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab( "Marginal Externality") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+
+multiplot(p_MEV_SIR,p_MEV_SIS,p_pv_SIR,p_pv_SIS,p_ext_SIR,p_ext_SIS,cols=3) 
+
+# Total externalities
+
+total_SIS_all <- MEV[2:(length(vaccine) -1),c(1,8)]
+total_SIS_all[,3] <- pv_out[2:(length(vaccine) -1),8]
+total_SIS_all[,4] <- "All"
+colnames(total_SIS_all) <- c("Vaccine", "MEV","PV", "Distribution")
+
+
+total_SIR_all <- MEV[2:(length(vaccine) -1),c(1,12)]
+total_SIR_all[,3] <- pv_out[2:(length(vaccine) -1),12]
+total_SIR_all[,4] <- "All "
+colnames(total_SIR_all) <- c("Vaccine", "MEV","PV", "Distribution ")
+
+
+```
+
+
+
+#### Third Scenario: 
+
+* Vaccines for just  80% of the population 
+* The vaccine is distributed evenly among the patches
+* Patches with connectivity.
+
+```{r param_change1}
+
+Vmax<- 2.4e6
+
+vacc_distr <- c(1/3,1/3,1/3)
+
+```
+```{r externalities3, echo=FALSE, message=FALSE, warning=FALSE, error= FALSE}
+
+ext <- vacc_externalities(npop=npop, alpha=alpha, rec=rec, ro=ro, N=N,ef=ef, I0=I0,Vmax=Vmax,vacc_distr=vacc_distr)
+
+vaccine <- ext[,1]
+
+MEV <- ext[,c(1:12)]
+
+for (i in 2:length(vaccine)){
+  
+  MEV[i, c(5,6,7)] <-(ext[i, c(5,6,7)] - ext[i-1, c(5,6,7)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  MEV[i, c(8,12)] <- (ext[i, c(8,12)] - ext[i-1, c(8,12)]) / (ext[i,1] - ext[i-1,1])
+  MEV[i, c(9,10,11)] <-(ext[i, c(9,10,11)] - ext[i-1, c(9,10,11)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+}
+
+pv_out <- ext[c(1:4,13:20)]
+
+## ---- Plotting ---- ##
+
+# SIS 
+
+x <- MEV[2:(length(vaccine) -1),c(2,5)]
+x[,3] <- pv_out[2:(length(vaccine) -1),5]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV", "Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,6)]
+y[,3] <- pv_out[2:(length(vaccine) -1),6]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV", "Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,7)]
+z[,3] <- pv_out[2:(length(vaccine) -1),7]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+plot_SIS <- rbind(x,y,z)
+plot_SIS[5] <- plot_SIS[,2] - plot_SIS[,3]
+colnames(plot_SIS)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+#SIR 
+
+x <- MEV[2:(length(vaccine) -1),c(2,9)]
+x[,3] <- pv_out[2:(length(vaccine) -1),9]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV","Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,10)]
+y[,3] <- pv_out[2:(length(vaccine) -1),10]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV","Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,11)]
+z[,3] <- pv_out[2:(length(vaccine) -1),11]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+
+plot_SIR <- rbind(x,y,z)
+plot_SIR[5] <- plot_SIR[,2] - plot_SIR[,3]
+colnames(plot_SIR)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+
+last_row <- length(vaccine) -1 
+
+p_MEV_SIR1 <- ggplot(plot_SIR, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_pv_SIR1 <-  ggplot(plot_SIR, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_ext_SIR1 <- ggplot(plot_SIR, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("Marginal Externality") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+
+p_MEV_SIS1 <- ggplot(plot_SIS, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_pv_SIS1<-  ggplot(plot_SIS, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_ext_SIS1<- ggplot(plot_SIS, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab( "Marginal Externality") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+
+multiplot(p_MEV_SIR1,p_MEV_SIS1,p_pv_SIR1,p_pv_SIS1,p_ext_SIR1,p_ext_SIS1,cols=3) 
+
+
+
+
+# Total externalities
+
+total_SIS1 <- MEV[2:(length(vaccine) -1),c(1,8)]
+total_SIS1[,3] <- pv_out[2:(length(vaccine) -1),8]
+total_SIS1[,4] <- "Equal"
+colnames(total_SIS1) <- c("Vaccine", "MEV","PV", "Distribution")
+
+
+total_SIR1 <- MEV[2:(length(vaccine) -1),c(1,12)]
+total_SIR1[,3] <- pv_out[2:(length(vaccine) -1),12]
+total_SIR1[,4] <- "Equal "
+colnames(total_SIR1) <- c("Vaccine", "MEV","PV", "Distribution ")
+
+```
+
+####  Fourth Scenario: 
+
+* Vaccines for just  80% of the population 
+* The vaccine is distributed according to burden of the disease, prioritising hight tranmission settings
+* Patches with connectivity.
+
+
+
+```{r param_change2, echo=FALSE, message=FALSE, warning=FALSE, error= FALSE}
+
+vacc_distr <- c(0.4/2.4,1/2.4,1/2.4)
+
+ext <- vacc_externalities(npop=npop, alpha=alpha, rec=rec, ro=ro, N=N,ef=ef, I0=I0,Vmax=Vmax,vacc_distr=vacc_distr)
+
+vaccine <- ext[,1]
+
+MEV <- ext[,c(1:12)]
+
+for (i in 2:length(vaccine)){
+  
+  MEV[i, c(5,6,7)] <-(ext[i, c(5,6,7)] - ext[i-1, c(5,6,7)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  MEV[i, c(8,12)] <- (ext[i, c(8,12)] - ext[i-1, c(8,12)]) / (ext[i,1] - ext[i-1,1])
+  MEV[i, c(9,10,11)] <-(ext[i, c(9,10,11)] - ext[i-1, c(9,10,11)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+}
+
+pv_out <- ext[c(1:4,13:20)]
+
+## ---- Plotting ---- ##
+
+# SIS 
+
+x <- MEV[2:(length(vaccine) -1),c(2,5)]
+x[,3] <- pv_out[2:(length(vaccine) -1),5]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV", "Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,6)]
+y[,3] <- pv_out[2:(length(vaccine) -1),6]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV", "Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,7)]
+z[,3] <- pv_out[2:(length(vaccine) -1),7]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+plot_SIS <- rbind(x,y,z)
+plot_SIS[5] <- plot_SIS[,2] - plot_SIS[,3]
+colnames(plot_SIS)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+#SIR 
+
+x <- MEV[2:(length(vaccine) -1),c(2,9)]
+x[,3] <- pv_out[2:(length(vaccine) -1),9]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV","Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,10)]
+y[,3] <- pv_out[2:(length(vaccine) -1),10]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV","Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,11)]
+z[,3] <- pv_out[2:(length(vaccine) -1),11]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+
+plot_SIR <- rbind(x,y,z)
+plot_SIR[5] <- plot_SIR[,2] - plot_SIR[,3]
+colnames(plot_SIR)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+
+last_row <- length(vaccine) -1 
+
+p_MEV_SIR2 <- ggplot(plot_SIR, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_pv_SIR2 <-  ggplot(plot_SIR, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_ext_SIR2 <- ggplot(plot_SIR, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("Marginal Externality") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+
+p_MEV_SIS2 <- ggplot(plot_SIS, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_pv_SIS2<-  ggplot(plot_SIS, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_ext_SIS2<- ggplot(plot_SIS, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab( "Marginal Externality") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+
+multiplot(p_MEV_SIR2,p_MEV_SIS2,p_pv_SIR2,p_pv_SIS2,p_ext_SIR2,p_ext_SIS2,cols=3) 
+
+
+
+# Total externalities
+
+total_SIS2 <- MEV[2:(length(vaccine) -1),c(1,8)]
+total_SIS2[,3] <- pv_out[2:(length(vaccine) -1),8]
+total_SIS2[,4] <- "Scheme 1"
+colnames(total_SIS2) <- c("Vaccine", "MEV","PV", "Distribution")
+
+
+total_SIR2 <- MEV[2:(length(vaccine) -1),c(1,12)]
+total_SIR2[,3] <- pv_out[2:(length(vaccine) -1),12]
+total_SIR2[,4] <- "Scheme 1 "
+colnames(total_SIR2) <- c("Vaccine", "MEV","PV", "Distribution ")
+
+
+```
+
+####  Fifth Scenario: 
+
+* Vaccines for just  80% of the population 
+* The vaccine is distributed according to burden of the disease, prioritising low tranmission settings
+* Patches with connectivity.
+
+
+```{r param_change3, echo=FALSE, message=FALSE, warning=FALSE, error= FALSE}
+
+vacc_distr <- c(1/2.4,1/2.4,0.4/2.4)
+
+ext <- vacc_externalities(npop=npop, alpha=alpha, rec=rec, ro=ro, N=N,ef=ef, I0=I0,Vmax=Vmax,vacc_distr=vacc_distr)
+
+vaccine <- ext[,1]
+
+MEV <- ext[,c(1:12)]
+
+for (i in 2:length(vaccine)){
+  
+  MEV[i, c(5,6,7)] <-(ext[i, c(5,6,7)] - ext[i-1, c(5,6,7)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+  MEV[i, c(8,12)] <- (ext[i, c(8,12)] - ext[i-1, c(8,12)]) / (ext[i,1] - ext[i-1,1])
+  MEV[i, c(9,10,11)] <-(ext[i, c(9,10,11)] - ext[i-1, c(9,10,11)]) / ((ext[i,1] - ext[i-1,1])*vacc_distr)
+}
+
+pv_out <- ext[c(1:4,13:20)]
+
+## ---- Plotting ---- ##
+
+
+# SIS 
+
+x <- MEV[2:(length(vaccine) -1),c(2,5)]
+x[,3] <- pv_out[2:(length(vaccine) -1),5]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV", "Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,6)]
+y[,3] <- pv_out[2:(length(vaccine) -1),6]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV", "Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,7)]
+z[,3] <- pv_out[2:(length(vaccine) -1),7]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+plot_SIS <- rbind(x,y,z)
+plot_SIS[5] <- plot_SIS[,2] - plot_SIS[,3]
+colnames(plot_SIS)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+#SIR 
+
+x <- MEV[2:(length(vaccine) -1),c(2,9)]
+x[,3] <- pv_out[2:(length(vaccine) -1),9]
+x[,4] <- "Low"
+colnames(x) <- c("Vaccine", "MEV","PV","Patch")
+
+y <- MEV[2:(length(vaccine) -1),c(3,10)]
+y[,3] <- pv_out[2:(length(vaccine) -1),10]
+y[,4] <- "Medium"
+colnames(y) <- c("Vaccine", "MEV","PV","Patch")
+
+z <- MEV[2:(length(vaccine) -1),c(4,11)]
+z[,3] <- pv_out[2:(length(vaccine) -1),11]
+z[,4] <- "High"
+colnames(z) <- c("Vaccine", "MEV","PV", "Patch")
+
+
+plot_SIR <- rbind(x,y,z)
+plot_SIR[5] <- plot_SIR[,2] - plot_SIR[,3]
+colnames(plot_SIR)<-  c("Vaccine", "MEV","PV", "Patch","Externalities")
+
+
+last_row <- length(vaccine) -1 
+
+p_MEV_SIR3 <- ggplot(plot_SIR, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_pv_SIR3 <-  ggplot(plot_SIR, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+p_ext_SIR3 <- ggplot(plot_SIR, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("Marginal Externality") + theme(legend.position="none") + scale_colour_brewer(palette="Dark2")
+
+p_MEV_SIS3 <- ggplot(plot_SIS, aes(x = Vaccine, y = MEV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MSB")  + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_pv_SIS3<-  ggplot(plot_SIS, aes(x = Vaccine, y = PV , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab("MPB") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+p_ext_SIS3<- ggplot(plot_SIS, aes(x = Vaccine, y = Externalities , col = Patch)) + geom_line()+ xlab("Vaccinations") + ylab( "Marginal Externality") + theme(legend.position="none")  + scale_colour_brewer(palette="Dark2")
+
+multiplot(p_MEV_SIR3,p_MEV_SIS3,p_pv_SIR3,p_pv_SIS3,p_ext_SIR3,p_ext_SIS3,cols=3) 
+
+# Total externalities
+
+total_SIS3 <- MEV[2:(length(vaccine) -1),c(1,8)]
+total_SIS3[,3] <- pv_out[2:(length(vaccine) -1),8]
+total_SIS3[,4] <- "Scheme 2"
+colnames(total_SIS3) <- c("Vaccine", "MEV","PV", "Distribution")
+
+
+total_SIR3 <- MEV[2:(length(vaccine) -1),c(1,12)]
+total_SIR3[,3] <- pv_out[2:(length(vaccine) -1),12]
+total_SIR3[,4] <- "Scheme 2 "
+colnames(total_SIR3) <- c("Vaccine", "MEV","PV", "Distribution ")
+
+
+```
+
+## Externalities for the all the model 
+
+
+```{r plot_ext_schemes}
+
+plot_schemes <- function (df, yValue, Ylabel,pTitle,Vmax){
+  
+  col =  c("#00AFBB", "#E7B800", "#FC4E07", "#CCCCCC")
+  
+ret<-  ggplot(df,aes(x=Vaccine,y=df[,yValue],col=Distribution,linetype=Distribution, size=Distribution, alpha=Distribution)) + geom_line() + ylab(Ylabel)+ xlab("Vaccinations")  + ggtitle(pTitle) +
+  scale_alpha_manual(values=c(1,1,1,0.8)) +
+  scale_size_manual(values= c(1.2,1.2,1.2,1.2)) +
+scale_color_manual(values=c(col[4], col[1],col[2], col[3] )) + scale_linetype_manual(values=c("dashed","solid","solid" ,"solid"))+ geom_vline(xintercept=Vmax, colour= alpha("grey65"),linetype="solid") +  theme(legend.position="none")# +  expand_limits(y=0) 
+  
+  return(ret)  
+  
+}
+
+plot_total_SIR <- rbind(total_SIR1,total_SIR2,total_SIR3, total_SIR_all)
+plot_total_SIR[5] <- plot_total_SIR[,2] - plot_total_SIR[,3]
+colnames(plot_total_SIR)<-  c("Vaccine", "MEV","PV", "Distribution","Externalities")
+
+TOTAL_MEV_SIR <- plot_schemes(plot_total_SIR, 2, "MSB","",Vmax)
+TOTAL_PV_SIR <- plot_schemes(plot_total_SIR, 3, "MPV","",Vmax)
+total_ext_SIR <- plot_schemes(plot_total_SIR, 5, "Marginal externalities","",Vmax)
+
+
+
+plot_total_SIS <- rbind(total_SIS1,total_SIS2,total_SIS3, total_SIS_all)
+plot_total_SIS[5] <- plot_total_SIS[,2] - plot_total_SIS[,3]
+colnames(plot_total_SIS)<-  c("Vaccine", "MEV","PV", "Distribution","Externalities")
+
+TOTAL_MEV_SIS <- plot_schemes(plot_total_SIS, 2, "MSB","",Vmax)
+TOTAL_PV_SIS <- plot_schemes(plot_total_SIS, 3, "MPV","",Vmax)
+total_ext_SIS <- plot_schemes(plot_total_SIS, 5, "Marginal externalities","",Vmax)
+
+
+
+multiplot(TOTAL_MEV_SIR,TOTAL_MEV_SIS,TOTAL_PV_SIR, TOTAL_PV_SIS,total_ext_SIR,total_ext_SIS,cols=3) 
+
+
+
+
+```
+
+
+
+

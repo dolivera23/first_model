@@ -1,0 +1,228 @@
+---
+title: "Report 3 - Vaccination externalities"
+author: "Daniela Olivera"
+Date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+options(width = 2000)
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
+
+# Load function file
+source ("../fcns.R")
+
+# Installing requiered packages
+if ( !require(rootSolve)) install.packages("rootSolve")
+library(rootSolve)
+
+
+if ( !require(ggplot2)) install.packages("ggplot2")
+library("ggplot2")
+
+```
+
+### The system 
+
+The system is three patch meta-population model. Each patch has its own disease dynamics (SIS o SIR) and is interconnected, as shown below.  
+
+
+<center>
+![](Patch_model.png#center){width=30%} //
+</center>
+
+
+**Setting up the model parameters for the model:** 
+
+1. Number of patches: _npop_
+2. Population in each patch: _N_
+3. Individual Ro: _ro_ &rarr; 1.5 - 5 - 15
+4. Patch recovery rate: _rec_
+5. Interaction matrix between patches:  **Rows of the marix must sum 1**
+$$\mathbf{\alpha } = \left[\begin{array}
+{rrr}
+\alpha_{LL} & \alpha_{LM} & \alpha_{LH} \\
+\alpha_{ML} & \alpha_{MM} & \alpha_{MH} \\
+\alpha_{HL} & \alpha_{HM} & \alpha_{HH}
+\end{array}\right]
+$$
+
+```{r parameters}
+
+# General parameters for all the models
+npop <- 3
+N <- c(1e6, 1e6, 1e6)
+rec <- c(0.5, 0.5, 0.5)
+ro <- c(1.5,5,15)
+alpha <-  matrix(c(0.95, 0.02, 0.03, 0.02, 0.96, 0.02, 0.03, 0.02, 0.95),  nrow = 3,ncol = 3, byrow = TRUE)
+ef<- 1
+I0 <- c(1, 1, 1)
+
+#Time
+tt <- seq(0, 100, length.out = 201)
+```
+
+### 1. Next generation matrix (NGM)
+
+$$\mathbf{NGM } = \left[\begin{array}
+{rrr}
+\frac{\beta_L \alpha_{LL}}{\gamma_L} & \frac{\beta_L \alpha_{LM}}{\gamma_M} & \frac{\beta_L \alpha_{LH}}{\gamma_H} \\
+\frac{\beta_M \alpha_{ML}}{\gamma_L} &  \frac{\beta_M \alpha_{MM}}{\gamma_M} & \frac{\beta_M \alpha_{MH}}{\gamma_H} \\
+\frac{\beta_H \alpha_{HL}}{\gamma_L} & \frac{\beta_H \alpha_{HM}}{\gamma_M} & \frac{\beta_H  \alpha_{HH}}{\gamma_H}
+\end{array}\right]
+$$
+
+The problem with the NGM was in the parametrisation. In the $\alpha$ matrix  each entry "measures the relative strength of transmission to sub population *i* to sub population *j*" and I was assuming $\alpha_{ii} =1$ Therefore the total relative strength of transmission in each patch was higher than one
+
+```{r R0, echo=FALSE}
+rep_number <- R0(alpha, rec, ro)
+```
+After I changed the parameters and the code, the Ro value for the three patch model is **`r rep_number`** 
+
+
+
+
+### 2. Coverage screening and bug in solver:
+
+
+* I managed to find the bug in the equations solvers and now the solver works for any set of parameters I've tried so far.
+* I did the screening instead of the optimisation algorithm and it runs smoothly. I am having trouble on how to plot the results in a nice way. 
+* So far the screening evaluates Ro and the fraction  of cases averted with SIS and SIR model. The results are saved on a data frame like the one below. 
+
+
+```{r cpv_screening, message=FALSE, warning=FALSE, error= FALSE, results="hide"}
+
+
+vec_cov <- seq(0,1,0.05)
+
+C <- cov_screening (vec_cov, alpha, rec, ro, N,ef, I0)
+
+
+Vmax <- 2.2e6
+
+sub <- subset(C,(C[,1]*N[1]+ C[,2]*N[2]+ C[,3]*N[3])<Vmax)
+
+newdata <- sub[order(sub[,4]),] 
+
+```
+```{r print_table}
+
+print.data.frame(head(newdata))
+
+```
+
+### 3. Vaccine externalities (Boulier et al (2007) Paper)
+
+```{r vacc_externalities, message=FALSE, warning=FALSE, error= FALSE}
+
+source("../Vaccination_externalities.R")
+
+```
+
+Here is a table with the most used terms on the paper that are needed to calculate vaccination externalities: 
+
+Term                             | Symbol              | Definition
+----------------                 | --------------------| ----------------        
+Cost of the disease              |  *k*                | Cost an individual incurs if infected
+Probability of infection         |  *p(V)*             | Probability of becoming infected given that V people are vaccinated
+Vaccine effectiveness            |  *m*                | Vaccine effectiveness
+Marginal effect of a vaccination |  MEV                | Number of cases averted per each additional vaccine: $\frac{\Delta AvertedCases} {\Delta Vaccines}$
+Marginal social benefit          |  MSB                | Net social value of vaccination
+Marginal private benefit         |  MPB                | The difference between the expected costs of the disease with and without vaccination. (Direct protection in epidemiology)
+Vaccination externalities        |  ME                 | The difference between MSB and MPB (The indirect protection in epidemiology)
+ 
+####Asumptions:
+
+* Vaccines are distributed equally among the three patches. 
+* Vaccinations are purchased and administrated before the model is run.  
+* All simulation were run with 100% vaccine effectiveness (however the code now allows to change this)
+* $k =1$
+ 
+
+### 1. Marginal social benefits of vaccination:  
+
+1.1 The first step to estimate MSB is to find the MEV. This is the number of cases averted per each additional vaccination. 
+
+
+<center>
+![](MEV.jpg#center){width=70%} //
+</center>
+
+
+
+
+For the meta-population model different behaviours are seen for SIS and SIR models as well as the different transmission intensities. 
+
+**Note: At the moment I am plotting every 100 additional vaccines. Maybe the peaks would be smoother with a smaller step but it takes a long time computing** 
+
+
+
+
+
+```{r fig_MEV, echo=FALSE} 
+ ggarrange(ggarrange(p_MEV_SIS, p_MEV_SIR, ncol = 2, labels = c("A", "B")), p_MEV ,nrow = 2)
+
+```
+
+
+
+1.2 The Marginal Social benefit is $MSB = MEV * k$. At the moment k is set as 1, consequently the MEV and MSB graphs are the same. 
+
+
+
+### 2. Marginal private benefits of vaccination:
+
+Boulier et al. define the marginal private benefit as the difference between the cost of the disease and the expected cost of the disease if the individual is vaccinated. 
+
+$$ MPB = p(V)k - (1-m) p(V) k = m p(V) k $$
+Where $p(V)$ is the probability of being infected given that V people are vaccinated.
+
+<center>
+//
+![](Pv.jpg#center){width=70%} //
+//
+</center>
+
+
+$$ p(V) = \frac{Total Infections - Initial Infections} {Initial Susceptible Population} = \frac{Total infecions - I_o} {N- mV- I_o}$$
+**Comments:** 
+
+* I used the same approach to estimate de probability of infection but I think it is not the same probability of infection used in epidemiology. 
+
+* They called the MPB curve a demand curve. I haven't been able to understand why they called it like that. 
+
+
+```{r fig_Pv, echo=FALSE} 
+ ggarrange(ggarrange(p_pv_SIS, p_pv_SIR, ncol = 2, labels = c("A", "B")), p_pv,nrow = 2)
+```
+
+
+Since we are assuming that $k=1$ and the vaccine efficiency is 100% the MPB and PEV graphs are the same. 
+
+### 3. Vaccination externalities
+
+The vaccination externalities is just the difference between the MSB and MPB curves.  
+
+<center>
+
+![](VE.jpg#center){width=70%} 
+
+</center>
+
+
+With the meta-population patch model: 
+
+
+```{r vacc_ext}
+
+
+try <-  cbind(MEV[2:length(vaccine) ,c(1,5,9)],pv_out[ 2:length(vaccine),c(5,9)] )
+colnames(try) <- c("Vaccine", "MSB SIS", "MSB SIR", "MPB SIS", "MPB SIR")
+try_long <- melt(try, id.vars = "Vaccine")
+p <- ggplot(try_long, aes(x = Vaccine, y = value , col = variable)) + geom_line()+ xlab("Vaccines") + ylab("Marginal Benefits")+scale_color_manual(values=c("brown4", "gray35",	"brown2", "gray1"))
+p
+
+```
+
